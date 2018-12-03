@@ -1,38 +1,49 @@
+import os
 import numpy as np
-
-from torchvision import transforms
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from .rather_small_net import Net
-from .loss_functions import f1_loss, binary_cross_entropy_with_logits
+import torch.nn as nn
+from torchvision import transforms
+from torch.utils.data import DataLoader
+
+from .net import *
+from .loss_functions import *
 from .transforms import *
-from .datasets import TrainImageDataset, TestImageDataset
+from .datasets import ImageDataset
 
+def weights_init(m):
+    if isinstance(m, nn.Conv2d):
+        # xavier(m.weight.data)
+        # xavier(m.bias.data)
+        nn.init.xavier_uniform(m.weight)
+        nn.init.constant(m.bias, 0.1)
 
-def get_dataset(image_dir, train=True):
-    transform = transforms.Compose([CombineColors(), ToTensor()])
+def get_network(pretrained):
+    # net = Custom()
+    net = Resnet(pretrained=pretrained)
 
-    if train:
-        dataset = TrainImageDataset(label_file='/home/wcc/data/kaggle_protein/train.csv',
-                         image_dir=image_dir,
-                         transform=transform)
+    return net
+
+def get_dataset(data_dir, mode):
+    if mode == 'train':
+        image_dir = os.path.join(data_dir, 'train')
+        label_file = os.path.join(data_dir, 'train.csv')
+        dataset = ImageDataset(image_dir=image_dir, label_file=label_file, mode=mode)
     else:
-        dataset = TestImageDataset(image_dir=image_dir,
-                         transform=transform)
+        image_dir = os.path.join(data_dir, 'test')
+        label_file = os.path.join(data_dir, 'sample_submission.csv')
+        dataset = ImageDataset(image_dir=image_dir, label_file=label_file, mode=mode)
+
     return dataset
 
-
-def get_train_val_split(dataset, trainBS, valBS, val_split, subsample, n_subsample=1000, **kwargs):
+def get_train_val_split(dataset):
     n_images = len(dataset)
-    if subsample:
-        arr = np.random.choice(n_images, n_subsample, replace=False)
-        train_idxs = arr[:int(n_subsample * (1 - val_split))]
-        val_idxs = arr[int(n_subsample * (1 - val_split)):]
-    else:
-        arr = np.random.choice(n_images, n_images, replace=False)
-        train_idxs = arr[:int(n_images * (1 - val_split))]
-        val_idxs = arr[int(n_images * (1 - val_split)):]
+    val_split = 0.1
+
+    arr = np.random.choice(n_images, n_images, replace=False)
+    train_idxs = arr[:int(n_images * (1 - val_split))]
+    val_idxs = arr[int(n_images * (1 - val_split)):]
+
     trainset = []
     valset = []
     print('getting training set...')
@@ -43,23 +54,14 @@ def get_train_val_split(dataset, trainBS, valBS, val_split, subsample, n_subsamp
     for i in tqdm(val_idxs):
         sample = dataset[i]
         valset.append(sample)
-    trainLoader = DataLoader(dataset=trainset, batch_size=trainBS, shuffle=True, **kwargs)
-    valLoader = DataLoader(dataset=valset, batch_size=valBS, shuffle=False, **kwargs)
-    return trainLoader, valLoader
 
+    return trainset, valset
 
-def get_network(pretrained=False):
-    if pretrained:
-        pass # can't pass pretrained net yet
-    else:
-        net = Net()
-        return net
+def get_loss_function():
+    return sigmoid_cross_entropy_with_logits
 
+def l1_penalty(var):
+    return torch.abs(var).sum()
 
-def get_loss_function(lf='bce'):
-    if lf == 'bce':
-        return binary_cross_entropy_with_logits
-    elif lf == 'f1':
-        return f1_loss
-    else:
-        raise ModuleNotFoundError('loss function not found')
+def l2_penalty(var):
+    return torch.sqrt(torch.pow(var, 2).sum())

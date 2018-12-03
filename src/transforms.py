@@ -7,11 +7,11 @@ class CombineColors(object):
     def __call__(self, sample):
         img_name = sample['image_id']
         img_red = sample['image_red']
-        img_blue = sample['image_blue']
         img_green = sample['image_green']
+        img_blue = sample['image_blue']
         img_yellow = sample['image_yellow']
         labels = sample['labels']
-        image = np.dstack((img_red, img_blue, img_green, img_yellow))
+        image = np.dstack((img_red, img_green, img_blue, img_yellow))
 
         return {'image': image, 'labels': labels, 'image_id': img_name}
 
@@ -29,6 +29,7 @@ class ToTensor(object):
         return {'image': torch.from_numpy(image).type(torch.FloatTensor),
                 'labels': torch.from_numpy(labels).type(torch.FloatTensor),
                 'image_id': img_name}
+        # return {'image': torch.from_numpy(image).type(torch.LongTensor), 'labels': torch.from_numpy(labels).type(torch.LongTensor), 'image_id': img_name}
 
 class Normalize(object):
     """Normalize a tensor image with mean and standard deviation.
