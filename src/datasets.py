@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 from PIL import Image
 from imgaug import augmenters as iaa
-from skimage import io, transform, img_as_float
 
 import torch
 from torchvision import transforms
@@ -23,9 +22,7 @@ class ImageDataset(Dataset):
         self.image_ids = self.to_one_hot(pd.read_csv(label_file))
         self.image_dir = image_dir
         self.trans = transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()])
-        # self.trans = transforms.Compose([transforms.ToTensor()])
         self.augument = augument
-        # self.oriimage = transforms.Compose([GenerateOriginalImage()])
 
     def to_one_hot(self, df):
         if self.mode == 'train':
@@ -39,32 +36,24 @@ class ImageDataset(Dataset):
         return len(self.image_ids)
 
     def __getitem__(self, idx):
-        ############################## save original image #################################
-        # img_red = io.imread(os.path.join(self.image_dir, img_red))
-        # img_green = io.imread(os.path.join(self.image_dir, img_green))
-        # img_blue = io.imread(os.path.join(self.image_dir, img_blue))
-        # img_yellow = io.imread(os.path.join(self.image_dir, img_yellow))
-        #
-        # img = {'image_id': img_name,
-        #        'image_red': img_red,
-        #        'image_blue': img_blue,
-        #        'image_green': img_green}
-        # ori_image = self.oriimage(img)
-        # io.imsave(os.path.join(self.image_dir, "../OriginalImage/") + ori_image['image_id'] + ".png", ori_image["image"])
-        ###################################################################################
-
         img_name = self.image_ids.iloc[idx, 0]
 
-        image = np.zeros(shape=(512, 512, 4))
+        image = np.zeros(shape=(512, 512, 3))
+        # image = np.zeros(shape=(512, 512, 4))
         r = np.array(Image.open(os.path.join(self.image_dir, img_name + "_red.png")))
         g = np.array(Image.open(os.path.join(self.image_dir, img_name + "_green.png")))
         b = np.array(Image.open(os.path.join(self.image_dir, img_name + "_blue.png")))
-        y = np.array(Image.open(os.path.join(self.image_dir, img_name + "_yellow.png")))
+        # y = np.array(Image.open(os.path.join(self.image_dir, img_name + "_yellow.png")))
         image[:,:,0] = r.astype(np.uint8)
         image[:,:,1] = g.astype(np.uint8)
         image[:,:,2] = b.astype(np.uint8)
-        image[:,:,3] = y.astype(np.uint8)
+        # image[:,:,3] = y.astype(np.uint8)
         image = image.astype(np.uint8)
+
+        ############################## save original image #################################
+        # image_ori = Image.fromarray(image).convert('RGB')
+        # image_ori.save(os.path.join(self.image_dir, "../OriginalImage/" + self.mode + "/") + img_name + ".png")
+        ###################################################################################
 
         if self.augument:
             image = self.augumentor(image)
@@ -95,20 +84,8 @@ class ImageDataset(Dataset):
                 iaa.Affine(shear=(-16, 16)),
                 iaa.Fliplr(0.5),
                 iaa.Flipud(0.5),
-
+                iaa.GaussianBlur(0.1),
             ])], random_order=True)
 
         image_aug = augment_img.augment_image(image)
         return image_aug
-
-class GenerateOriginalImage(object):
-    """Combines the the image in a sample to a given size."""
-
-    def __call__(self, sample):
-        img_name = sample['image_id']
-        img_red = sample['image_red']
-        img_green = sample['image_green']
-        img_blue = sample['image_blue']
-        image = np.dstack((img_red, img_green, img_blue))
-
-        return {'image': image, 'image_id': img_name}

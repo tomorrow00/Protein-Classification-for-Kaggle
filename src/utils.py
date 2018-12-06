@@ -11,16 +11,19 @@ from .loss_functions import *
 from .transforms import *
 from .datasets import ImageDataset
 
-def weights_init(m):
-    if isinstance(m, nn.Conv2d):
-        # xavier(m.weight.data)
-        # xavier(m.bias.data)
-        nn.init.xavier_uniform(m.weight)
-        nn.init.constant(m.bias, 0.1)
-
-def get_network(pretrained):
-    # net = Custom()
-    net = Resnet(pretrained=pretrained)
+def get_network(architecture, pretrained):
+    if architecture == 'custom':
+        net = Custom()
+    elif architecture == 'resnet':
+        net = Resnet(pretrained=pretrained)
+    elif architecture == 'bcnn':
+        net = BCNN(pretrained=pretrained)
+    elif architecture == 'densenet':
+        net = Densenet(pretrained=pretrained)
+    elif architecture == 'inception':
+        net = Inception(pretrained=pretrained)
+    elif architecture == 'squeezenet':
+        net = Squeezenet(pretrained=pretrained)
 
     return net
 

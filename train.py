@@ -22,6 +22,8 @@ def get_params():
     parser.add_argument('-p', '--pretrained', action='store_true')
     parser.add_argument('-l', '--load')
 
+    parser.add_argument('--architecture', type=str, default='resnet', help='Choose architecture from custom, resnet, bcnn, densenet, inception, squeezenet')
+
     parser.add_argument('--lr', type=float, default=0.01, help='Learning Rate. Default=0.01')
     parser.add_argument('--beta1', type=float, default=0.9, help='Beta1 of Adam. Default=0.9')
     parser.add_argument('--beta2', type=float, default=0.999, help='Beta2 of Adam. Default=0.999')
@@ -62,13 +64,15 @@ def main():
         print("Loading network: {}".format(args.load))
         net = torch.load(args.load)
     else:
-        net = get_network(args.pretrained)
+        net = get_network(args.architecture, args.pretrained)
 
     device_ids = list(map(int, args.useGPU.split(',')))
     net = net.cuda()
     net = torch.nn.DataParallel(net, device_ids=device_ids)
 
-    summary(net, input_size=(4, 512, 512))
+    summary(net, input_size=(3, 512, 512))
+    # summary(net, input_size=(4, 512, 512))
+    # print(net)
 
     ################################ data ##############################
 
@@ -91,16 +95,15 @@ def main():
     ################################ criterion and optimizer ##############################
 
     print("\nCreating criterion and optimizer...")
+    print("criterion with BCEWithLogitsLoss, optimizer with " + args.opt)
+
     # criterion = get_loss_function()
     criterion = torch.nn.BCEWithLogitsLoss().cuda()
 
     if args.opt == 'sgd':
         optimizer = torch.optim.SGD(net.parameters(), momentum=0.9, weight_decay=1e-4, lr=args.lr)
     elif args.opt == 'adam':
-        if args.lr == 0.001:
-            optimizer = torch.optim.Adam(net.parameters(), betas=(args.beta1, args.beta2))
-        else:
-            optimizer = torch.optim.Adam(net.parameters(), betas=(args.beta1, args.beta2), lr=args.lr)
+        optimizer = torch.optim.Adam(net.parameters(), betas=(args.beta1, args.beta2), lr=args.lr)
     elif args.opt == 'rmsprop':
         optimizer = torch.optim.RMSprop(net.parameters(), lr=args.lr)
     else:
@@ -116,8 +119,12 @@ def main():
 
         if epoch % 10 == 0:
             torch.save(net, os.path.join(args.save, '%d.pth' % epoch))
+
+        # if args.opt == 'sgd' and epoch % 5 == 0:
+        if epoch % 5 == 0:
             for param_group in optimizer.param_groups:
                 param_group['lr'] = param_group['lr'] * 0.5
+
         print("\n")
 
 def train(args, epoch, net, trainLoader, criterion, optimizer):
@@ -135,19 +142,10 @@ def train(args, epoch, net, trainLoader, criterion, optimizer):
         # forward + backward + optimize
         outputs = net(inputs)       # outputs.shape labels.shape 16*28
         loss = criterion(outputs, labels)
-        # print(loss)
-
-        ######################### mean_loss ######################
-        # mean_loss = loss.mean()
-        ######################### sum_loss #######################
-        # sum_loss = loss.sum()
-
-        # loss = loss.mean() + args.lambda2 * l2_penalty(outputs)
         loss = loss + args.lambda2 * l2_penalty(outputs)
+        # loss *= 28
         loss.backward()
 
-        # sum_loss += args.lambda2 * l2_penalty(outputs)
-        # sum_loss.backward()
         optimizer.step()
 
         nProcessed += len(inputs)
@@ -166,6 +164,7 @@ def train(args, epoch, net, trainLoader, criterion, optimizer):
             rec = tp / (tp + fn)
         except ZeroDivisionError:
             rec = 0.0
+        # print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f} {:.6f}'.format(epoch, nProcessed, nTrain, 100. * batch_idx / len(trainLoader), loss.item(), loss.item() / 28))
         print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(epoch, nProcessed, nTrain, 100. * batch_idx / len(trainLoader), loss.item()))
         for param_lr in optimizer.param_groups:
             print('learning_rate:' + str(param_lr['lr']))
