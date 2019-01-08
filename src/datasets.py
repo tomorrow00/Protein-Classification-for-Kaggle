@@ -11,7 +11,7 @@ from torch.utils.data import Dataset
 class ImageDataset(Dataset):
     """Fluorescence microscopy images of protein structures training dataset"""
 
-    def __init__(self, image_dir, label_file, mode, augument=False):
+    def __init__(self, image_dir, df, mode, augument=True):
         """
         Args:
             label_file (string): Path to the csv file with annotations.
@@ -19,9 +19,10 @@ class ImageDataset(Dataset):
         """
 
         self.mode = mode
-        self.image_ids = self.to_one_hot(pd.read_csv(label_file))
+        self.image_df = df
         self.image_dir = image_dir
         self.trans = transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()])
+        # self.trans = transforms.Compose([transforms.ToPILImage(), transforms.ToTensor(), transforms.Resize(272)])
         self.augument = augument
 
     def to_one_hot(self, df):
@@ -33,17 +34,24 @@ class ImageDataset(Dataset):
             return df
 
     def __len__(self):
-        return len(self.image_ids)
+        return len(self.image_df)
 
     def __getitem__(self, idx):
-        img_name = self.image_ids.iloc[idx, 0]
+        img_name = self.image_df.iloc[idx, 0]
 
         image = np.zeros(shape=(512, 512, 3))
         # image = np.zeros(shape=(512, 512, 4))
-        r = np.array(Image.open(os.path.join(self.image_dir, img_name + "_red.png")))
-        g = np.array(Image.open(os.path.join(self.image_dir, img_name + "_green.png")))
-        b = np.array(Image.open(os.path.join(self.image_dir, img_name + "_blue.png")))
-        # y = np.array(Image.open(os.path.join(self.image_dir, img_name + "_yellow.png")))
+        if self.image_dir.split('/')[-1] == "external":
+            r = np.array(Image.open(os.path.join(self.image_dir, img_name + "_red.jpg")))
+            g = np.array(Image.open(os.path.join(self.image_dir, img_name + "_green.jpg")))
+            b = np.array(Image.open(os.path.join(self.image_dir, img_name + "_blue.jpg")))
+            # y = np.array(Image.open(os.path.join(self.image_dir, img_name + "_yellow.jpg")))
+        else:
+            r = np.array(Image.open(os.path.join(self.image_dir, img_name + "_red.png")))
+            g = np.array(Image.open(os.path.join(self.image_dir, img_name + "_green.png")))
+            b = np.array(Image.open(os.path.join(self.image_dir, img_name + "_blue.png")))
+            # y = np.array(Image.open(os.path.join(self.image_dir, img_name + "_yellow.png")))
+
         image[:,:,0] = r.astype(np.uint8)
         image[:,:,1] = g.astype(np.uint8)
         image[:,:,2] = b.astype(np.uint8)
@@ -62,8 +70,11 @@ class ImageDataset(Dataset):
             image = self.trans(image)
 
         if self.mode == 'train':
-            label = self.image_ids.iloc[idx, 2:].values
-            label = label.astype(np.float16)
+            label = np.array(list(map(int, self.image_df.iloc[idx].Target.split(' '))))
+            label = np.eye(28, dtype=np.float)[label].sum(axis=0)
+            for i in range(len(label)):
+                if label[i] != 1. and label[i] != 0.:
+                    label[i] = 1.
             label = torch.from_numpy(label).type(torch.FloatTensor)
 
             return img_name, image.float(), label
@@ -81,10 +92,11 @@ class ImageDataset(Dataset):
                 iaa.Affine(rotate=90),
                 iaa.Affine(rotate=180),
                 iaa.Affine(rotate=270),
-                iaa.Affine(shear=(-16, 16)),
                 iaa.Fliplr(0.5),
                 iaa.Flipud(0.5),
                 iaa.GaussianBlur(0.1),
+                iaa.CropAndPad(percent=(-0.25, 0.25)),
+                iaa.Multiply((0.5, 1.5)),
             ])], random_order=True)
 
         image_aug = augment_img.augment_image(image)
