@@ -70,19 +70,15 @@ def main():
     print("\nCreating architecture...")
     torch.cuda.manual_seed_all(args.seed)
 
-    net = get_network(args.architecture, args.pretrained)
+    # net = get_network(args.architecture, args.pretrained)
     if args.load:
-        # loadfile = sorted(os.listdir(os.path.join('work/%s/%s' % (args.network_name, 'pretrained'))), key=lambda x:int(x.split(".")[0]), reverse=True)[0]
-        loadfile = 'best_loss.pth'
+        loadfile = sorted(os.listdir(os.path.join('work/%s/%s' % (args.network_name, 'pretrained'))), key=lambda x:int(x.split(".")[0]), reverse=True)[0]
+        # loadfile = 'best_loss.pth'
         # loadfile = 'best_f1.pth'
-        loadfile = os.path.join('work/%s/%s' % (args.network_name, '1'), loadfile)
+        loadfile = os.path.join('work/%s/%s' % (args.network_name, 'pretrained'), loadfile)
         print("Loading network: {}".format(loadfile))
-        # m = torch.load(loadfile)
-        # print(m)
-        # module.conv1_7x7_s2.weight
-        # net.load_state_dict(torch.load(loadfile))
-        net.load_state_dict({k.replace('module.',''):v for k,v in torch.load(loadfile).items()})
-
+        net = torch.load(loadfile)
+        # net.load_state_dict({k.replace('module.',''):v for k,v in torch.load(loadfile).items()})
 
     net = net.cuda()
     device_ids = list(map(int, args.useGPU.split(',')))
@@ -95,7 +91,7 @@ def main():
     ################################ data ##############################
 
     print("\nLoading data...")
-    dataset = get_dataset(DATA_DIR, mode='train', split=args.split, subsample=args.subsample, folds=config.folds, foldnum=config.foldnum-1)
+    dataset = get_dataset(DATA_DIR, mode='train', split=args.split, subsample=args.subsample, folds=config.folds, foldnum=config.foldnum)
 
     if args.split:
         trainset, valset = dataset

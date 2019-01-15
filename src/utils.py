@@ -36,7 +36,7 @@ def get_network(architecture, pretrained):
     elif architecture == 'squeezenet':
         net = Squeezenet(pretrained=pretrained)
     elif architecture == 'bninception':
-        net = get_bninception()
+        net = get_pretrained_network()
 
     return net
 
@@ -49,25 +49,26 @@ def get_dataset(data_dir, mode, split, subsample, folds, foldnum):
 
         internal_df = pd.read_csv(os.path.join(data_dir, 'train_internal.csv'))
         external_df = pd.read_csv(os.path.join(data_dir, 'train_external.csv'))
-        subsample_df = pd.read_csv(os.path.join(data_dir, 'train_subsample.csv')).sample(frac=1)
+        # subsample_df = pd.read_csv(os.path.join(data_dir, 'train_subsample.csv')).sample(frac=1)
         # internal_df = internal_df.sample(200)
-        external_df = external_df.sample(200)
+        # external_df = external_df.sample(200)
 
         # oversample
-        # internal_df = oversample(internal_df, "in")
-        # external_df = oversample(external_df, "ex")
+        internal_df = oversample(internal_df, "in")
+        external_df = oversample(external_df, "ex")
 
         if subsample:
             all_df = all_df[:100]
 
         if split:
             # KFolds
-            train_df, val_df = kfolds(external_df, folds, foldnum)
+            print(str(folds) + " folds cross validation with fold " + str(foldnum))
+            train_df, val_df = kfolds(external_df, folds, foldnum - 1)
 
-            # train_dataset_internal = ImageDataset(image_dir=internal_image_dir, df=internal_df, mode=mode, augument=True)
-            # train_dataset_external = ImageDataset(image_dir=external_image_dir, df=train_df, mode=mode, augument=True)
-            # train_dataset = train_dataset_internal + train_dataset_external
-            train_dataset = ImageDataset(image_dir=internal_image_dir, df=subsample_df, mode=mode, augument=True)
+            train_dataset_internal = ImageDataset(image_dir=internal_image_dir, df=internal_df, mode=mode, augument=True)
+            train_dataset_external = ImageDataset(image_dir=external_image_dir, df=train_df, mode=mode, augument=True)
+            train_dataset = train_dataset_internal + train_dataset_external
+            # train_dataset = ImageDataset(image_dir=internal_image_dir, df=subsample_df, mode=mode, augument=True)
 
             val_dataset = ImageDataset(image_dir=external_image_dir, df=val_df, mode=mode, augument=False)
 
@@ -106,8 +107,6 @@ def oversample(train_df, cls):
     return train_df
 
 def kfolds(df, folds, foldnum):
-    print(str(folds) + " folds cross validation with fold " + str(foldnum))
-
     train_df = pd.DataFrame(columns=["Id", "Target"])
 
     for i in range(folds):

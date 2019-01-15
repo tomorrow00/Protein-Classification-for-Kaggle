@@ -42,7 +42,7 @@ def get_params():
 
     parser.add_argument('--batchSize', type=int, default=1, help='training batch size')
 
-    parser.add_argument('--showGPU', type=str, default="1", help='GPUs for CUDA_VISIBLE_DEVICES.')
+    parser.add_argument('--showGPU', type=str, default="0", help='GPUs for CUDA_VISIBLE_DEVICES.')
     parser.add_argument('--useGPU', type=str, default="0", help='GPUs to use.')
 
     parser.add_argument('--seed', type=int, default=50)
@@ -59,18 +59,31 @@ def main():
     print("\nCreating architecture...")
     torch.cuda.manual_seed_all(args.seed)
 
+    # net = get_network(args.architecture, args.pretrained)
+    #
     # args.load = sorted(os.listdir(args.save), key=lambda x:int(x.split(".")[0]), reverse=True)[0]
-    args.load = "best_loss.pth"
-    # args.load = "best_f1.pth"
-    loadforcsv = args.load.strip('.pth')
-    args.load = os.path.join(args.save, args.load)
-    print("Loading network: {}".format(args.load))
+    # # args.load = "best_loss.pth"
+    # # args.load = "best_f1.pth"
+    # loadforcsv = args.load.strip('.pth')
+    # args.load = os.path.join(args.save, args.load)
+    # print("Loading network: {}".format(args.load))
+    #
+    # net.load_state_dict({k.replace('module.',''):v for k,v in torch.load(args.load).items()})
+    # net = net.cuda()
 
-    net = get_network(args.architecture, args.pretrained)
-    # net = torch.load(args.load)
-    # net.load_state_dict(torch.load(args.load))
-    net.load_state_dict({k.replace('module.',''):v for k,v in torch.load(args.load).items()})
-    net = net.cuda()
+    net_fold1 = get_network(args.architecture, args.pretrained)
+    loadfile_fold1 = '/home/ws/competition/protein/work/bninception/fold1/best_f1.pth'
+    print("Loading network: {}".format(loadfile_fold1))
+    net_fold1.load_state_dict({k.replace('module.',''):v for k,v in torch.load(loadfile_fold1).items()})
+    net_fold1 = net_fold1.cuda()
+
+    net_fold2 = get_network(args.architecture, args.pretrained)
+    loadfile_fold2 ='/home/ws/competition/protein/work/bninception/fold2/20.pth'
+    print("Loading network: {}".format(loadfile_fold2))
+    net_fold2.load_state_dict({k.replace('module.',''):v for k,v in torch.load(loadfile_fold2).items()})
+    net_fold2 = net_fold2.cuda()
+
+    loadforcsv = '2fold'
 
     # device_ids = list(map(int, args.useGPU.split(',')))
     # net = torch.nn.DataParallel(net, device_ids=device_ids)
@@ -84,7 +97,7 @@ def main():
     dataset = get_dataset(DATA_DIR, mode='test', split=False, subsample=False, folds=config.folds, foldnum=config.foldnum-1)
     testLoader = DataLoader(dataset=dataset, batch_size=args.batchSize, num_workers=4, pin_memory=True, shuffle=False)
 
-    csv_file = os.path.join('result', args.network_name + '_' + loadforcsv + '_' + str(datetime.datetime.now().strftime("%m-%d %H:%M")) + '.csv')
+    csv_file = os.path.join('result', args.network_name + '_' + args.dataset_name + '_' + loadforcsv + '_' + str(datetime.datetime.now().strftime("%m-%d %H:%M")) + '.csv')
     print(csv_file)
     if os.path.exists(csv_file):
         os.remove(csv_file)
@@ -92,31 +105,38 @@ def main():
     ################################ test ##############################
 
     print("\nTesting...")
-    test(net, testLoader, csv_file)
+    test(net_fold1, net_fold2, testLoader, csv_file)
 
-def test(net, testLoader, csv_file):
-    net.eval()
+def test(net_fold1, net_fold2, testLoader, csv_file):
+    net_fold1.eval()
+    net_fold2.eval()
+
     writein = {}
     writein["Id"] = []
     writein["Predicted"] = []
 
     for batch_idx, (imagename, inputs) in enumerate(testLoader):
         inputs = inputs.cuda()
-        outputs = net(inputs)
+        outputs1 = net_fold1(inputs)
+        outputs2 = net_fold2(inputs)
 
         print(batch_idx)
         print(imagename[0])
 
-        # pred = torch.sigmoid(outputs).data.gt(0.4)
-        pred = outputs.sigmoid().cpu().data.numpy()[0]
-
+        pred1 = outputs1.sigmoid().cpu().data.numpy()[0]
+        pred2 = outputs2.sigmoid().cpu().data.numpy()[0]
         prediction = []
+        for i in range(len(pred1)):
+            p = (pred1[i] + pred2[i]) / 2
+            prediction.append(1 if p > 0.3 else 0)
+
+        # prediction = []
         # q = []
-        for i, p in enumerate(pred):
-            # print('%.2f, %.2f, 0.15' % (p, float((PROTEIN_NUM1[i] + PROTEIN_NUM2[i]) / NUM_ALL)))
-            # prediction.append(1 if p > float((PROTEIN_NUM1[i] + PROTEIN_NUM2[i]) / NUM_ALL) else 0)
-            # q.append(1 if p > 0.15 else 0)
-            prediction.append(1 if p > 0.15 else 0)
+        # for i, p in enumerate(pred):
+        #     # print('%.2f, %.2f, 0.15' % (p, float((PROTEIN_NUM1[i] + PROTEIN_NUM2[i]) / NUM_ALL)))
+        #     # prediction.append(1 if p > float((PROTEIN_NUM1[i] + PROTEIN_NUM2[i]) / NUM_ALL) else 0)
+        #     # q.append(1 if p > 0.15 else 0)
+        #     prediction.append(1 if p > 0.15 else 0)
 
         prediction = [x for x in range(len(prediction)) if prediction[x] == 1]
         prediction = " ".join(str(p) for p in prediction)
@@ -142,4 +162,3 @@ if __name__ == '__main__':
     args = get_params()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.showGPU
     main()
-

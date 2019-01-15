@@ -39,23 +39,23 @@ class ImageDataset(Dataset):
     def __getitem__(self, idx):
         img_name = self.image_df.iloc[idx, 0]
 
-        image = np.zeros(shape=(512, 512, 3))
-        # image = np.zeros(shape=(512, 512, 4))
+        # image = np.zeros(shape=(512, 512, 3))
+        image = np.zeros(shape=(512, 512, 4))
         if self.image_dir.split('/')[-1] == "external":
             r = np.array(Image.open(os.path.join(self.image_dir, img_name + "_red.jpg")))
             g = np.array(Image.open(os.path.join(self.image_dir, img_name + "_green.jpg")))
             b = np.array(Image.open(os.path.join(self.image_dir, img_name + "_blue.jpg")))
-            # y = np.array(Image.open(os.path.join(self.image_dir, img_name + "_yellow.jpg")))
+            y = np.array(Image.open(os.path.join(self.image_dir, img_name + "_yellow.jpg")))
         else:
             r = np.array(Image.open(os.path.join(self.image_dir, img_name + "_red.png")))
             g = np.array(Image.open(os.path.join(self.image_dir, img_name + "_green.png")))
             b = np.array(Image.open(os.path.join(self.image_dir, img_name + "_blue.png")))
-            # y = np.array(Image.open(os.path.join(self.image_dir, img_name + "_yellow.png")))
+            y = np.array(Image.open(os.path.join(self.image_dir, img_name + "_yellow.png")))
 
         image[:,:,0] = r.astype(np.uint8)
         image[:,:,1] = g.astype(np.uint8)
         image[:,:,2] = b.astype(np.uint8)
-        # image[:,:,3] = y.astype(np.uint8)
+        image[:,:,3] = y.astype(np.uint8)
         image = image.astype(np.uint8)
 
         ############################## save original image #################################

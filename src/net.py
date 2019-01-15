@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.init as init
 import torchvision
 from pretrainedmodels.models import bninception
+from pretrainedmodels.models import inceptionv4
 
 class Custom(nn.Module):
     def __init__(self):
@@ -404,16 +405,30 @@ class Squeezenet(nn.Module):
 
         return x
 
-def get_bninception():
-    print("BNInception is used.")
-    model = bninception(pretrained="imagenet")
+def get_pretrained_network():
+    add_channel = torch.empty(64, 1, 7, 7)
+    init.xavier_normal_(add_channel)
 
-    model.global_pool = nn.AdaptiveAvgPool2d(1)
-    # model.conv1_7x7_s2 = nn.Conv2d(4, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3))
+    model = bninception(pretrained="imagenet")
+    print("BNInception is used.")
+    w = model.conv1_7x7_s2.weight
+    model.conv1_7x7_s2 = nn.Conv2d(4, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3))
+    model.conv1_7x7_s2.weight = nn.Parameter(torch.cat((w, add_channel), dim=1))
+    # model.global_pool = nn.AdaptiveAvgPool2d(1)
+
+
+    # model = inceptionv4(pretrained="imagenet")
+    # print("Inception_v4 is used.")
+    # w = model.features[0].conv.weight
+    # model.features[0].conv = nn.Conv2d(4, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3))
+    # model.features[0].conv.weight = nn.Parameter(torch.cat((w, add_channel), dim=1))
+    # print(model)
+    # model.global_pool = nn.AdaptiveAvgPool2d(1)
+
 
     # 固定参数
-    for param in model.parameters():
-        param.requires_grad = False
+    # for param in model.parameters():
+    #     param.requires_grad = False
 
     model.last_linear = nn.Sequential(
                 nn.BatchNorm1d(1024),
@@ -421,7 +436,5 @@ def get_bninception():
                 nn.ReLU(inplace=True),
                 nn.Linear(1024, 28),
             )
-    # print(model.last_linear)
 
     return model
-

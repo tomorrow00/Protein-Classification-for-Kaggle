@@ -1,14 +1,14 @@
 class DefaultConfigs(object):
     architecture='bninception'
-    showGPU = '0,1'
-    useGPU = '0,1'
+    showGPU = '1'
+    useGPU = '0'
 
     folds = 5
-    foldnum = 1
+    foldnum = 5
 
-    opt = 'adam'
+    opt = 'sgd'
     lr = 0.03
-    batchSize = 8
+    batchSize = 16
     nEpochs = 500
     step_size = 10
     gamma = 0.2
