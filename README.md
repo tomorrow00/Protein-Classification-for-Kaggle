@@ -1,8 +1,10 @@
 # Kaggle Protein Classification
 
-contain resnet, bcnn based on resnet, inception v3, densenet and one custom net
+contain several pretrained network including resnet, inception and densenet
 
-based on bninception
+build a new network called BCNN based on VGG16
+
+final submission based on bninception
 
 highest score on public leaderboard is 0.505
 
